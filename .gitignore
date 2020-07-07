@@ -118,6 +118,10 @@ ENV/
 data-bin/
 examples/translation/iwslt17.de_fr.en.bpe16k/
 examples/translation/iwslt17_orig/
+examples/translation/orig/
+examples/translation/subword-nmt/
+examples/translation/mosesdecoder/
+examples/translation/iwslt14.tokenized.de-en/
 pip-wheel-metadata/
 # reranking
 /examples/reranking/rerank_data
