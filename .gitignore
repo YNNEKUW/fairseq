@@ -116,7 +116,9 @@ ENV/
 
 # data
 data-bin/
-
+examples/translation/iwslt17.de_fr.en.bpe16k/
+examples/translation/iwslt17_orig/
+pip-wheel-metadata/
 # reranking
 /examples/reranking/rerank_data
 
