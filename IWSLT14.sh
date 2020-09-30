@@ -1,4 +1,4 @@
-fairseq-train \
+python fairseq_cli/train.py \
     data-bin/iwslt14.tokenized.de-en \
     --arch transformer_iwslt_de_en \
     --share-decoder-input-output-embed \

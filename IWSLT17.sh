@@ -1,4 +1,4 @@
-fairseq-train data-bin/iwslt17.de_fr.en.bpe16k/ \
+python fairseq_cli/train.py data-bin/iwslt17.de_fr.en.bpe16k/ \
     --max-epoch 50 \
     --ddp-backend=no_c10d \
     --task multilingual_translation \
