@@ -9,10 +9,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from fairseq import utils
-from fairseq.modules import LayerNorm, MultiheadAttention
+from fairseq.modules import LayerNorm, MultiheadAttention, MultiheadAttention_Nor
 from fairseq.modules.quant_noise import quant_noise
 from torch import Tensor
+from torch.nn import Parameter
 
+
+class TransformerXLEncoderLayer(nn.Module):
+    def __init__(self, args):
+        super().__init__()
 
 class TransformerEncoderLayer(nn.Module):
     """Encoder layer block.
@@ -53,6 +58,12 @@ class TransformerEncoderLayer(nn.Module):
         )
 
         self.final_layer_norm = LayerNorm(self.embed_dim)
+
+        # https://arxiv.org/abs/2004.08249
+        # Add an extra parameter when training deeper models
+        self.omega1 = Parameter(torch.tensor(1.))
+        self.omega2 = Parameter(torch.tensor(1.))
+
 
     def build_fc1(self, input_dim, output_dim, q_noise, qn_block_size):
         return quant_noise(nn.Linear(input_dim, output_dim), p=q_noise, block_size=qn_block_size)
@@ -119,6 +130,7 @@ class TransformerEncoderLayer(nn.Module):
             attn_mask=attn_mask,
         )
         x = F.dropout(x, p=self.dropout, training=self.training)
+        #x = self.omega1 * residual + x
         x = residual + x
         if not self.normalize_before:
             x = self.self_attn_layer_norm(x)
@@ -131,6 +143,7 @@ class TransformerEncoderLayer(nn.Module):
         x = F.dropout(x, p=float(self.activation_dropout), training=self.training)
         x = self.fc2(x)
         x = F.dropout(x, p=self.dropout, training=self.training)
+        #x = self.omega2 * residual + x
         x = residual + x
         if not self.normalize_before:
             x = self.final_layer_norm(x)
@@ -204,6 +217,12 @@ class TransformerDecoderLayer(nn.Module):
         self.need_attn = True
 
         self.onnx_trace = False
+        # https://arxiv.org/abs/2004.08249
+        # Add an extra parameter when training deeper models
+        # self.omega1 = Parameter(torch.tensor(1.))
+        # self.omega2 = Parameter(torch.tensor(1.))
+        # self.omega3 = Parameter(torch.tensor(1.))
+
 
     def build_fc1(self, input_dim, output_dim, q_noise, qn_block_size):
         return quant_noise(nn.Linear(input_dim, output_dim), q_noise, qn_block_size)
@@ -315,6 +334,7 @@ class TransformerDecoderLayer(nn.Module):
             attn_mask=self_attn_mask,
         )
         x = F.dropout(x, p=self.dropout, training=self.training)
+        #x = self.omega1 * residual + x
         x = residual + x
         if not self.normalize_before:
             x = self.self_attn_layer_norm(x)
@@ -345,6 +365,7 @@ class TransformerDecoderLayer(nn.Module):
                 need_head_weights=need_head_weights,
             )
             x = F.dropout(x, p=self.dropout, training=self.training)
+            #x = self.omega2 * residual + x
             x = residual + x
             if not self.normalize_before:
                 x = self.encoder_attn_layer_norm(x)
@@ -357,6 +378,7 @@ class TransformerDecoderLayer(nn.Module):
         x = F.dropout(x, p=float(self.activation_dropout), training=self.training)
         x = self.fc2(x)
         x = F.dropout(x, p=self.dropout, training=self.training)
+        #x = self.omega3 * residual + x
         x = residual + x
         if not self.normalize_before:
             x = self.final_layer_norm(x)

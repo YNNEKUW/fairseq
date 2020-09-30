@@ -22,7 +22,7 @@ from .layer_norm import Fp32LayerNorm, LayerNorm
 from .learned_positional_embedding import LearnedPositionalEmbedding
 from .lightweight_convolution import LightweightConv, LightweightConv1dTBC
 from .linearized_convolution import LinearizedConvolution
-from .multihead_attention import MultiheadAttention
+from .multihead_attention import MultiheadAttention, MultiheadAttention_Nor
 from .positional_embedding import PositionalEmbedding
 from .scalar_bias import ScalarBias
 from .sinusoidal_positional_embedding import SinusoidalPositionalEmbedding
@@ -31,6 +31,7 @@ from .transformer_sentence_encoder import TransformerSentenceEncoder
 from .unfold import unfold1d
 from .transformer_layer import TransformerDecoderLayer, TransformerEncoderLayer
 from .vggblock import VGGBlock
+from .ops import LayerNorm, RelMultiheadAttention, PositionwiseFFN, Dense, AttentionStructure
 
 __all__ = [
     'AdaptiveInput',

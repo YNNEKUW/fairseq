@@ -18,4 +18,4 @@ fairseq-train data-bin/iwslt17.de_fr.en.bpe16k/ \
     --save-dir checkpoints/multilingual_transformer \
     --max-tokens 4000 \
     --update-freq 8 \
-    --num-workers 15 \
+    --num-workers 4 \

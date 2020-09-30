@@ -2,7 +2,7 @@
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
-
+import pdb
 import math
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -29,6 +29,8 @@ from fairseq.modules import (
 )
 from fairseq.modules.quant_noise import quant_noise as apply_quant_noise_
 from torch import Tensor
+
+from fairseq.modules.ops import AttentionStructure, PositionwiseFFN, RelMultiheadAttention
 
 
 DEFAULT_MAX_SOURCE_POSITIONS = 1024
@@ -317,7 +319,7 @@ class TransformerEncoder(FairseqEncoder):
         self.max_source_positions = args.max_source_positions
 
         self.embed_tokens = embed_tokens
-
+        
         self.embed_scale = 1.0 if args.no_scale_embedding else math.sqrt(embed_dim)
 
         self.embed_positions = (
@@ -347,6 +349,65 @@ class TransformerEncoder(FairseqEncoder):
         self.layers.extend(
             [self.build_encoder_layer(args) for i in range(args.encoder_layers)]
         )
+        # My config
+
+        class my_net_config:
+            dropout = 0.1
+            dropatt = 0.1
+            d_head = 64
+            n_head = 12
+            n_block = 3
+            d_model = 768
+            d_inner = 3072
+            dropact = 0.0
+            block_param = [2, 2, 2]
+        
+        class my_args:
+            truncate_seq = False
+            attn_type = "rel_shift"
+            seg_id_cls = 2
+        
+        cls_target = True
+
+        
+
+
+        self.funnel = False
+        if self.funnel:
+            self.net_config = my_net_config()
+            self.args = my_args()
+
+            self.attn_info = AttentionStructure(self.net_config, self.args)
+            self.attn_layers = nn.ModuleList()
+            self.pffn_layers = nn.ModuleList()
+
+            for block_idx in range(self.net_config.n_block):
+                for _ in range(self.net_config.block_param[block_idx]):
+                    self.attn_layers.append(
+                        RelMultiheadAttention(
+                            self.net_config,
+                            self.args,
+                            self.net_config.d_model,
+                            self.net_config.n_head,
+                            self.net_config.d_head,
+                            self.net_config.dropout,
+                            self.net_config.dropatt,
+                            block_idx,
+                        )
+                    )
+
+                    self.pffn_layers.append(
+                        PositionwiseFFN(
+                            self.net_config.d_model,
+                            self.net_config.d_inner,
+                            self.net_config.dropout,
+                            self.net_config.dropact,
+                        )
+                    )
+            # if cls_target:
+                # self.build_cls_head()
+
+
         self.num_layers = len(self.layers)
 
         if args.encoder_normalize_before:
@@ -357,7 +418,7 @@ class TransformerEncoder(FairseqEncoder):
             self.layernorm_embedding = LayerNorm(embed_dim)
         else:
             self.layernorm_embedding = None
-
+    
     def build_encoder_layer(self, args):
         return TransformerEncoderLayer(args)
 
@@ -395,6 +456,10 @@ class TransformerEncoder(FairseqEncoder):
                   hidden states of shape `(src_len, batch, embed_dim)`.
                   Only populated if *return_all_hiddens* is True.
         """
+        if self.funnel:
+            # w/o positional embedding here, do it later
+            x = self.embed_scale * self.embed_tokens(src_tokens)
+
         x, encoder_embedding = self.forward_embedding(src_tokens)
 
         # B x T x C -> T x B x C
@@ -948,11 +1013,11 @@ def transformer_iwslt_de_en(args):
     args.encoder_embed_dim = getattr(args, "encoder_embed_dim", 512)
     args.encoder_ffn_embed_dim = getattr(args, "encoder_ffn_embed_dim", 1024)
     args.encoder_attention_heads = getattr(args, "encoder_attention_heads", 4)
-    args.encoder_layers = getattr(args, "encoder_layers", 6)
+    args.encoder_layers = getattr(args, "encoder_layers", 24)
     args.decoder_embed_dim = getattr(args, "decoder_embed_dim", 512)
     args.decoder_ffn_embed_dim = getattr(args, "decoder_ffn_embed_dim", 1024)
     args.decoder_attention_heads = getattr(args, "decoder_attention_heads", 4)
-    args.decoder_layers = getattr(args, "decoder_layers", 6)
+    args.decoder_layers = getattr(args, "decoder_layers", 24)
     base_architecture(args)
 
 

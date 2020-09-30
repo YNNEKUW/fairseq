@@ -4,7 +4,7 @@ fairseq-train \
     --share-decoder-input-output-embed \
     --optimizer adam \
     --adam-betas '(0.9, 0.98)' \
-    --clip-norm 0.1 \
+    --clip-norm 0.0 \
     --lr 5e-4 \
     --lr-scheduler inverse_sqrt \
     --warmup-updates 4000 \
@@ -20,7 +20,4 @@ fairseq-train \
     --eval-bleu-print-samples \
     --best-checkpoint-metric bleu --maximize-best-checkpoint-metric \
     --num-workers 4 \
-    --save-dir checkpoints/transformer_iwslt_de_en_12_12
-
-
-# --clip-norm 0.1 # is required when using normalized version
+    --save-dir checkpoints/fuck

@@ -212,6 +212,7 @@ def train(args, trainer, task, epoch_itr):
     valid_subsets = args.valid_subset.split(",")
     should_stop = False
     for i, samples in enumerate(progress):
+        # """
         with metrics.aggregate("train_inner"), torch.autograd.profiler.record_function("train_step-%d" % i):
             log_output = trainer.train_step(samples)
             if log_output is None:  # OOM, overflow, ...
@@ -226,7 +227,7 @@ def train(args, trainer, task, epoch_itr):
             # reset mid-epoch stats after each log interval
             # the end-of-epoch stats will still be preserved
             metrics.reset_meters("train_inner")
-
+        # """
         end_of_epoch = not itr.has_next()
         valid_losses, should_stop = validate_and_save(
             args, trainer, task, epoch_itr, valid_subsets, end_of_epoch
