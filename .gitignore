@@ -136,3 +136,7 @@ pip-wheel-metadata/
 
 # Experimental Folder
 experimental/*
+
+# Battleship
+fairseq_cli_preprocess.py
+fairseq_cli_train.py
