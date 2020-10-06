@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from fairseq import utils
-from fairseq.modules import LayerNorm, MultiheadAttention, MultiheadAttention_Nor
+from fairseq.modules import LayerNorm, MultiheadAttention, MultiheadAttention_sigmoid
 from fairseq.modules.quant_noise import quant_noise
 from torch import Tensor
 from torch.nn import Parameter
@@ -72,7 +72,7 @@ class TransformerEncoderLayer(nn.Module):
         return quant_noise(nn.Linear(input_dim, output_dim), p=q_noise, block_size=qn_block_size)
 
     def build_self_attention(self, embed_dim, args):
-        return MultiheadAttention(
+        return MultiheadAttention_sigmoid(
             embed_dim,
             args.encoder_attention_heads,
             dropout=args.attention_dropout,
