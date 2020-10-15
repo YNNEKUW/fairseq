@@ -1030,6 +1030,8 @@ class MultiheadAttention_sigmoid(nn.Module):
 
         self.onnx_trace = False
         self.tpu = False
+        #self.sigmoid = nn.Sigmoid()
+        self.relu = nn.ReLU()
 
     def prepare_for_onnx_export_(self):
         self.onnx_trace = True
@@ -1312,8 +1314,9 @@ class MultiheadAttention_sigmoid(nn.Module):
         assert v is not None
         # attn = torch.bmm(attn_probs, v)
         # Approximation of Sigmoid
-        attn = 0.5 + 0.25 * torch.bmm(q, torch.bmm(k.transpose(1, 2), v))
-        
+        # attn = 0.5 + 0.25 * torch.bmm(q, torch.bmm(k.transpose(1, 2), v))
+        attn_weights_float = self.relu(torch.bmm(q, k.transpose(1, 2)))
+        attn = torch.bmm(attn_weights_float, v)
 
 
         assert list(attn.size()) == [bsz * self.num_heads, tgt_len, self.head_dim]

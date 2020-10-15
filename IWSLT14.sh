@@ -19,8 +19,8 @@ python fairseq_cli_train.py \
     --eval-bleu-remove-bpe \
     --eval-bleu-print-samples \
     --best-checkpoint-metric bleu --maximize-best-checkpoint-metric \
-    --num-workers 4 \
-    --save-dir checkpoints/transformer_iwslt_de_en_12_12
+    --num-workers 8 \
+    --save-dir /groups/alliryc/fairseq_checkpoints/transformer_iwslt_de_en_6_6_relu
 
 
 # --clip-norm 0.1 # is required when using normalized version

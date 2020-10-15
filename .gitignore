@@ -140,3 +140,5 @@ experimental/*
 # Battleship
 fairseq_cli_preprocess.py
 fairseq_cli_train.py
+IWSLT14.sh
+IWSLT14_local.sh
