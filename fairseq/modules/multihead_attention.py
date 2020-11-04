@@ -1297,7 +1297,7 @@ class MultiheadAttention_sigmoid(nn.Module):
             attn_weights = attn_weights.view(bsz * self.num_heads, tgt_len, src_len)
 
         """
-        """
+        # """
         if before_softmax:
             return attn_weights, v
 
@@ -1311,7 +1311,7 @@ class MultiheadAttention_sigmoid(nn.Module):
             p=self.dropout,
             training=self.training,
         )
-        """
+        # """
         assert v is not None
         # attn = torch.bmm(attn_probs, v)
         # Approximation of Sigmoid
