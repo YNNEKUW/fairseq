@@ -1,4 +1,4 @@
-fairseq-generate data-bin/iwslt14.tokenized.de-en \
+python fairseq_cli_generate.py data-bin/iwslt14.tokenized.de-en \
     --path $1 \
 	--batch-size 128 \
 	--beam 5 \
