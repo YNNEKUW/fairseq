@@ -1032,7 +1032,9 @@ class MultiheadAttention_sigmoid(nn.Module):
         self.tpu = False
         # self.sigmoid = nn.Sigmoid()
         self.relu = nn.ReLU()
+        self.leakyrelu = nn.LeakyReLU()
         # self.epsilon = 0.0001
+        # self.alpha = Parameter(torch.Tensor([0.25]))
 
     def prepare_for_onnx_export_(self):
         self.onnx_trace = True
@@ -1270,8 +1272,8 @@ class MultiheadAttention_sigmoid(nn.Module):
                 )
         """
 
-        attn_weights = torch.bmm(q, k.transpose(1, 2))
-        attn_weights = MultiheadAttention.apply_sparse_mask(attn_weights, tgt_len, src_len, bsz)
+        # attn_weights = torch.bmm(q, k.transpose(1, 2))
+        # attn_weights = MultiheadAttention.apply_sparse_mask(attn_weights, tgt_len, src_len, bsz)
         """
         assert list(attn_weights.size()) == [bsz * self.num_heads, tgt_len, src_len]
         
@@ -1297,7 +1299,7 @@ class MultiheadAttention_sigmoid(nn.Module):
             attn_weights = attn_weights.view(bsz * self.num_heads, tgt_len, src_len)
 
         """
-        # """
+        """
         if before_softmax:
             return attn_weights, v
 
@@ -1311,7 +1313,7 @@ class MultiheadAttention_sigmoid(nn.Module):
             p=self.dropout,
             training=self.training,
         )
-        # """
+        """
         assert v is not None
         # attn = torch.bmm(attn_probs, v)
         # Approximation of Sigmoid
@@ -1320,13 +1322,13 @@ class MultiheadAttention_sigmoid(nn.Module):
 
         # attn_weights_float = self.sigmoid(torch.bmm(q, k.transpose(1, 2)))
         # attn_weights_float = self.relu(torch.bmm(q, k.transpose(1, 2)))
-        # attn_weights_float = attn_weights_float / attn_weights_float.shape[1] / 0.25
-
+        attn_weights_float = self.leakyrelu(torch.bmm(q, k.transpose(1, 2)))
+        attn_weights_float = attn_weights_float / attn_weights_float.shape[1] / 0.25
         # attn_weights_float = torch.bmm(q, k.transpose(1, 2))
         # attn_weights_float = attn_weights_float / 700.
         # attn_weights_float = attn_weights_float / (torch.sum(attn_weights_float, dim=-1, keepdim=True) + 0.0001)
-        # attn = torch.bmm(attn_weights_float, v)
-        attn = torch.bmm(attn_weights, v)
+        attn = torch.bmm(attn_weights_float, v)
+        # attn = torch.bmm(attn_weights, v)
 
 
         assert list(attn.size()) == [bsz * self.num_heads, tgt_len, self.head_dim]
