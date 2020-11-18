@@ -1011,11 +1011,29 @@ class MultiheadAttention_sigmoid(nn.Module):
         assert not self.self_attention or self.qkv_same_dim, (
             "Self-attention requires query, key and " "value to be of the same size"
         )
-
+        """
         self.k_proj = quant_noise(nn.Linear(self.kdim, embed_dim, bias=bias), q_noise, qn_block_size)
         self.v_proj = quant_noise(nn.Linear(self.vdim, embed_dim, bias=bias), q_noise, qn_block_size)
         self.q_proj = quant_noise(nn.Linear(embed_dim, embed_dim, bias=bias), q_noise, qn_block_size)
+        """
+        self.scalar = 2
+        self.my_head_dim = int(self.head_dim / self.scalar)
+        my_max_lenght = 280
 
+        # my projection 2
+        self.my_q_k1_proj = quant_noise(nn.Linear(embed_dim, int(embed_dim/self.scalar), bias=bias), q_noise, qn_block_size)
+        self.my_v_k2_proj = quant_noise(nn.Linear(280, int(embed_dim/self.scalar), bias=bias), q_noise, qn_block_size)
+        """
+        # my projection 1
+        # [512, 768] -> [512, 768/8]
+        self.my_q_proj = quant_noise(nn.Linear(embed_dim, int(embed_dim/self.scalar), bias=bias), q_noise, qn_block_size)
+        # [280, 768] -> [280/8, 768]
+        self.my_v_proj = quant_noise(nn.Linear(280, int(280/self.scalar), bias=bias), q_noise, qn_block_size)
+        # [512, 768] -> [512, 768/8]
+        self.my_k_proj_1 = quant_noise(nn.Linear(self.kdim, int(self.kdim/self.scalar), bias=bias), q_noise, qn_block_size)
+        # [SEQ_LENGTH, 768/8] -> [280/8, 768/8]
+        self.my_k_proj_2 = quant_noise(nn.Linear(280, int(280/self.scalar), bias=bias), q_noise, qn_block_size)
+        """
         self.out_proj = quant_noise(nn.Linear(embed_dim, embed_dim, bias=bias), q_noise, qn_block_size)
 
         if add_bias_kv:
@@ -1031,8 +1049,8 @@ class MultiheadAttention_sigmoid(nn.Module):
         self.onnx_trace = False
         self.tpu = False
         # self.sigmoid = nn.Sigmoid()
-        self.relu = nn.ReLU()
-        self.leakyrelu = nn.LeakyReLU()
+        # self.relu = nn.ReLU()
+        # self.leakyrelu = nn.LeakyReLU()
         # self.epsilon = 0.0001
         # self.alpha = Parameter(torch.Tensor([0.25]))
 
@@ -1046,9 +1064,19 @@ class MultiheadAttention_sigmoid(nn.Module):
         if self.qkv_same_dim:
             # Empirically observed the convergence to be much better with
             # the scaled initialization
+            """
+            nn.init.xavier_uniform_(self.my_q_proj.weight)
+            nn.init.xavier_uniform_(self.my_k_proj_1.weight)
+            nn.init.xavier_uniform_(self.my_k_proj_2.weight)
+            nn.init.xavier_uniform_(self.my_v_proj.weight)
+            """
+            nn.init.xavier_uniform_(self.my_q_k1_proj.weight)
+            nn.init.xavier_uniform_(self.my_v_k2_proj.weight)
+            """
             nn.init.xavier_uniform_(self.k_proj.weight, gain=1 / math.sqrt(2))
             nn.init.xavier_uniform_(self.v_proj.weight, gain=1 / math.sqrt(2))
             nn.init.xavier_uniform_(self.q_proj.weight, gain=1 / math.sqrt(2))
+            """
         else:
             nn.init.xavier_uniform_(self.k_proj.weight)
             nn.init.xavier_uniform_(self.v_proj.weight)
@@ -1145,9 +1173,24 @@ class MultiheadAttention_sigmoid(nn.Module):
             saved_state = None
 
         if self.self_attention:
+            """
             q = self.q_proj(query)
             k = self.k_proj(query)
             v = self.v_proj(query)
+            """
+            # my projection 2
+            q = self.my_q_k1_proj(query)
+            v = torch.matmul(query.transpose(0, 2), self.my_v_k2_proj.weight.T[:query.size(0), ]).transpose(0, 2)
+            k_1 = self.my_q_k1_proj(query)
+            k = torch.matmul(k_1.transpose(0, 2), self.my_v_k2_proj.weight.T[:query.size(0), ]).transpose(0, 2)
+            """
+            # my projection 1
+            q = self.my_q_proj(query)
+            v = torch.matmul(query.transpose(0, 2), self.my_v_proj.weight.T[:query.size(0), ]).transpose(0, 2)
+            k_1 = self.my_k_proj_1(query)
+            k = torch.matmul(k_1.transpose(0, 2), self.my_k_proj_2.weight.T[:query.size(0), ]).transpose(0, 2)  
+            """
+
         elif self.encoder_decoder_attention:
             # encoder-decoder attention
             q = self.q_proj(query)
@@ -1162,7 +1205,7 @@ class MultiheadAttention_sigmoid(nn.Module):
             assert key is not None and value is not None
             q = self.q_proj(query)
             k = self.k_proj(key)
-            v = self.v_proj(value)
+            v = self.v_proj(value)        
         q *= self.scaling
 
         if self.bias_k is not None:
@@ -1181,7 +1224,25 @@ class MultiheadAttention_sigmoid(nn.Module):
                     ],
                     dim=1,
                 )
-
+        #"""
+        q = (
+            q.contiguous()
+            .view(tgt_len, bsz * self.num_heads, self.my_head_dim)
+            .transpose(0, 1)
+        )
+        if k is not None:
+            k = (
+                k.contiguous()
+                .view(-1, bsz * self.num_heads, self.my_head_dim)
+                .transpose(0, 1)
+            )
+        if v is not None:
+            v = (
+                v.contiguous()
+                .view(-1, bsz * self.num_heads, self.head_dim)
+                .transpose(0, 1)
+            )
+        """
         q = (
             q.contiguous()
             .view(tgt_len, bsz * self.num_heads, self.head_dim)
@@ -1199,6 +1260,7 @@ class MultiheadAttention_sigmoid(nn.Module):
                 .view(-1, bsz * self.num_heads, self.head_dim)
                 .transpose(0, 1)
             )
+        """
         """
         if saved_state is not None:
             # saved states are stored with shape (bsz, num_heads, seq_len, head_dim)
@@ -1241,7 +1303,7 @@ class MultiheadAttention_sigmoid(nn.Module):
         """
         assert k is not None
         src_len = k.size(1)
-
+        """
         # This is part of a workaround to get around fork/join parallelism
         # not supporting Optional types.
         if key_padding_mask is not None and key_padding_mask.dim() == 0:
@@ -1250,6 +1312,7 @@ class MultiheadAttention_sigmoid(nn.Module):
         if key_padding_mask is not None:
             assert key_padding_mask.size(0) == bsz
             assert key_padding_mask.size(1) == src_len
+        """
         """
         if self.add_zero_attn:
             assert v is not None
@@ -1271,9 +1334,8 @@ class MultiheadAttention_sigmoid(nn.Module):
                     dim=1,
                 )
         """
-
-        # attn_weights = torch.bmm(q, k.transpose(1, 2))
-        # attn_weights = MultiheadAttention.apply_sparse_mask(attn_weights, tgt_len, src_len, bsz)
+        attn_weights = torch.bmm(q, k.transpose(1, 2))
+        attn_weights = MultiheadAttention.apply_sparse_mask(attn_weights, tgt_len, src_len, bsz)
         """
         assert list(attn_weights.size()) == [bsz * self.num_heads, tgt_len, src_len]
         
@@ -1299,7 +1361,7 @@ class MultiheadAttention_sigmoid(nn.Module):
             attn_weights = attn_weights.view(bsz * self.num_heads, tgt_len, src_len)
 
         """
-        """
+        
         if before_softmax:
             return attn_weights, v
 
@@ -1313,22 +1375,37 @@ class MultiheadAttention_sigmoid(nn.Module):
             p=self.dropout,
             training=self.training,
         )
-        """
+        attn = torch.bmm(attn_probs, v)
+        
         assert v is not None
-        # attn = torch.bmm(attn_probs, v)
+        
         # Approximation of Sigmoid
         # attn = 0.5 + 0.25 * torch.bmm(q, torch.bmm(k.transpose(1, 2), v))
         # attn_weights_float = 0.5 + 0.25 * torch.bmm(q, k.transpose(1, 2))
 
         # attn_weights_float = self.sigmoid(torch.bmm(q, k.transpose(1, 2)))
         # attn_weights_float = self.relu(torch.bmm(q, k.transpose(1, 2)))
-        attn_weights_float = self.leakyrelu(torch.bmm(q, k.transpose(1, 2)))
-        attn_weights_float = attn_weights_float / attn_weights_float.shape[1] / 0.25
+        # attn_weights_float = self.relu(torch.bmm(q, k.transpose(1, 2)))
+        
+        # attn_weights_float = torch.bmm(q, k.transpose(1, 2))
+        # attn_weights_float = self.relu(torch.bmm(q, k.transpose(1, 2)))
+        # attn_weights_float = attn_weights_float / q.shape[1] / self.alpha
+        
         # attn_weights_float = torch.bmm(q, k.transpose(1, 2))
         # attn_weights_float = attn_weights_float / 700.
         # attn_weights_float = attn_weights_float / (torch.sum(attn_weights_float, dim=-1, keepdim=True) + 0.0001)
-        attn = torch.bmm(attn_weights_float, v)
-        # attn = torch.bmm(attn_weights, v)
+        
+        # """
+        """
+        attn_weights_float = F.dropout(
+            attn_weights_float,
+            p=self.dropout,
+            training=self.training,
+        )
+        """
+        # attn = torch.bmm(q, torch.bmm(k.transpose(1,2), v))
+        # attn = torch.bmm(attn_weights_float, v)
+        # """
 
 
         assert list(attn.size()) == [bsz * self.num_heads, tgt_len, self.head_dim]

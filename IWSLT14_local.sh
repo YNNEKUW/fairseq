@@ -1,11 +1,10 @@
 fairseq-train \
-    data-bin/iwslt14.tokenized.de-en \
+    data-bin/bug14 \
     --arch transformer_iwslt_de_en \
     --share-decoder-input-output-embed \
     --optimizer adam \
     --adam-betas '(0.9, 0.98)' \
-    --clip-norm 0.1 \
-    --lr 5e-4 \
+    --lr 1e-3 \
     --lr-scheduler inverse_sqrt \
     --warmup-updates 4000 \
     --dropout 0.3 \
@@ -19,8 +18,10 @@ fairseq-train \
     --eval-bleu-remove-bpe \
     --eval-bleu-print-samples \
     --best-checkpoint-metric bleu --maximize-best-checkpoint-metric \
-    --num-workers 4 \
-    --save-dir checkpoints/transformer_iwslt_de_en_6_6_relu_sum_alpha0.25
+    --num-workers 8 \
+    --save-dir checkpoints/transformer_iwslt_de_en_6_6_mine_baseline_v2_2_1e-3
 
 
+#   data-bin/iwslt14.tokenized.de-en \
+# --save-dir checkpoints/transformer_iwslt_de_en_6_6_relu_size_alpha0.25_noclip_test \
 # --clip-norm 0.1 # is required when using normalized version
