@@ -19,7 +19,7 @@ fairseq-train \
     --eval-bleu-print-samples \
     --best-checkpoint-metric bleu --maximize-best-checkpoint-metric \
     --num-workers 8 \
-    --save-dir checkpoints/transformer_iwslt_de_en_6_6_mine_baseline_v2_2_1e-3
+    --save-dir checkpoints/transformer_iwslt_de_en_6_6_mine_baseline_v2_2_test
 
 
 #   data-bin/iwslt14.tokenized.de-en \

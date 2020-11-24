@@ -1017,22 +1017,36 @@ class MultiheadAttention_sigmoid(nn.Module):
         self.q_proj = quant_noise(nn.Linear(embed_dim, embed_dim, bias=bias), q_noise, qn_block_size)
         """
         self.scalar = 2
+        self.beta = 4
+        my_max_length = 280
+        self.segment_length = int(my_max_length / self.beta)
         self.my_head_dim = int(self.head_dim / self.scalar)
-        my_max_lenght = 280
-
+        
+        # my projection 3
+        # group attention
+        self.my_q_k1_proj_1 = quant_noise(nn.Linear(int(embed_dim/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
+        self.my_q_k1_proj_2 = quant_noise(nn.Linear(int(embed_dim/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
+        self.my_q_k1_proj_3 = quant_noise(nn.Linear(int(embed_dim/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
+        self.my_q_k1_proj_4 = quant_noise(nn.Linear(int(embed_dim/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
+        
+        self.my_v_k2_proj_1 = quant_noise(nn.Linear(int(my_max_length/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
+        self.my_v_k2_proj_2 = quant_noise(nn.Linear(int(my_max_length/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
+        self.my_v_k2_proj_3 = quant_noise(nn.Linear(int(my_max_length/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
+        self.my_v_k2_proj_4 = quant_noise(nn.Linear(int(my_max_length/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
+        """
         # my projection 2
         self.my_q_k1_proj = quant_noise(nn.Linear(embed_dim, int(embed_dim/self.scalar), bias=bias), q_noise, qn_block_size)
-        self.my_v_k2_proj = quant_noise(nn.Linear(280, int(embed_dim/self.scalar), bias=bias), q_noise, qn_block_size)
-        """
+        self.my_v_k2_proj = quant_noise(nn.Linear(my_max_length, int(embed_dim/self.scalar), bias=bias), q_noise, qn_block_size)
+        
         # my projection 1
         # [512, 768] -> [512, 768/8]
         self.my_q_proj = quant_noise(nn.Linear(embed_dim, int(embed_dim/self.scalar), bias=bias), q_noise, qn_block_size)
         # [280, 768] -> [280/8, 768]
-        self.my_v_proj = quant_noise(nn.Linear(280, int(280/self.scalar), bias=bias), q_noise, qn_block_size)
+        self.my_v_proj = quant_noise(nn.Linear(my_max_length, int(my_max_length/self.scalar), bias=bias), q_noise, qn_block_size)
         # [512, 768] -> [512, 768/8]
         self.my_k_proj_1 = quant_noise(nn.Linear(self.kdim, int(self.kdim/self.scalar), bias=bias), q_noise, qn_block_size)
         # [SEQ_LENGTH, 768/8] -> [280/8, 768/8]
-        self.my_k_proj_2 = quant_noise(nn.Linear(280, int(280/self.scalar), bias=bias), q_noise, qn_block_size)
+        self.my_k_proj_2 = quant_noise(nn.Linear(my_max_length, int(my_max_length/self.scalar), bias=bias), q_noise, qn_block_size)
         """
         self.out_proj = quant_noise(nn.Linear(embed_dim, embed_dim, bias=bias), q_noise, qn_block_size)
 
@@ -1070,8 +1084,19 @@ class MultiheadAttention_sigmoid(nn.Module):
             nn.init.xavier_uniform_(self.my_k_proj_2.weight)
             nn.init.xavier_uniform_(self.my_v_proj.weight)
             """
+
+            nn.init.xavier_uniform_(self.my_q_k1_proj_1.weight)
+            nn.init.xavier_uniform_(self.my_q_k1_proj_2.weight)
+            nn.init.xavier_uniform_(self.my_q_k1_proj_3.weight)
+            nn.init.xavier_uniform_(self.my_q_k1_proj_4.weight)
+            nn.init.xavier_uniform_(self.my_v_k2_proj_1.weight)
+            nn.init.xavier_uniform_(self.my_v_k2_proj_2.weight)
+            nn.init.xavier_uniform_(self.my_v_k2_proj_3.weight)
+            nn.init.xavier_uniform_(self.my_v_k2_proj_4.weight)
+            """
             nn.init.xavier_uniform_(self.my_q_k1_proj.weight)
             nn.init.xavier_uniform_(self.my_v_k2_proj.weight)
+            """
             """
             nn.init.xavier_uniform_(self.k_proj.weight, gain=1 / math.sqrt(2))
             nn.init.xavier_uniform_(self.v_proj.weight, gain=1 / math.sqrt(2))
@@ -1178,12 +1203,65 @@ class MultiheadAttention_sigmoid(nn.Module):
             k = self.k_proj(query)
             v = self.v_proj(query)
             """
+            # my projection 3
+            # Q
+            assert query.shape[2] % self.beta == 0
+            query_split_on_dim = torch.split(query, int(query.shape[2]/self.beta), 2)
+            q = torch.cat((self.my_q_k1_proj_1(query_split_on_dim[0]),
+                           self.my_q_k1_proj_2(query_split_on_dim[1]),
+                           self.my_q_k1_proj_3(query_split_on_dim[2]),
+                           self.my_q_k1_proj_4(query_split_on_dim[3])), -1)
+            
+            # V
+            query_split_on_length = torch.split(query.transpose(0, 2), self.segment_length, 2)
+            if len(query_split_on_length) == 1:
+                v = torch.matmul(query_split_on_length[0], self.my_v_k2_proj_1.weight.T[:query_split_on_length[0].size(2), ]).transpose(0, 2)
+            elif len(query_split_on_length) == 2:
+                v = torch.cat((self.my_v_k2_proj_1(query_split_on_length[0]),
+                               torch.matmul(query_split_on_length[1], self.my_v_k2_proj_2.weight.T[:query_split_on_length[1].size(2), ])
+                              ), -1).transpose(0, 2)
+            elif len(query_split_on_length) == 3:
+                v = torch.cat((self.my_v_k2_proj_1(query_split_on_length[0]),
+                               self.my_v_k2_proj_2(query_split_on_length[1]),
+                               torch.matmul(query_split_on_length[2], self.my_v_k2_proj_3.weight.T[:query_split_on_length[2].size(2), ])
+                              ), -1).transpose(0, 2)
+            elif len(query_split_on_length) == 4:
+                v = torch.cat((self.my_v_k2_proj_1(query_split_on_length[0]),
+                               self.my_v_k2_proj_2(query_split_on_length[1]),
+                               self.my_v_k2_proj_3(query_split_on_length[2]),
+                               torch.matmul(query_split_on_length[3], self.my_v_k2_proj_4.weight.T[:query_split_on_length[3].size(2), ])
+                              ), -1).transpose(0, 2)
+            else:
+                assert False, "Shape of \"V\" is wrong."
+            
+            # K
+            q_split_on_length = torch.split(torch.clone(q).transpose(0, 2), self.segment_length, 2)           
+            if len(q_split_on_length) == 1:
+                k = torch.matmul(q_split_on_length[0], self.my_v_k2_proj_1.weight.T[:q_split_on_length[0].size(2), ]).transpose(0, 2)
+            elif len(q_split_on_length) == 2:
+                k = torch.cat((self.my_v_k2_proj_1(q_split_on_length[0]),
+                               torch.matmul(q_split_on_length[1], self.my_v_k2_proj_2.weight.T[:q_split_on_length[1].size(2), ])
+                              ), -1).transpose(0, 2)
+            elif len(q_split_on_length) == 3:
+                k = torch.cat((self.my_v_k2_proj_1(q_split_on_length[0]),
+                               self.my_v_k2_proj_2(q_split_on_length[1]),
+                               torch.matmul(q_split_on_length[2], self.my_v_k2_proj_3.weight.T[:q_split_on_length[2].size(2), ])
+                              ), -1).transpose(0, 2)
+            elif len(q_split_on_length) == 4:
+                k = torch.cat((self.my_v_k2_proj_1(q_split_on_length[0]),
+                               self.my_v_k2_proj_2(q_split_on_length[1]),
+                               self.my_v_k2_proj_3(q_split_on_length[2]),
+                               torch.matmul(q_split_on_length[3], self.my_v_k2_proj_4.weight.T[:q_split_on_length[3].size(2), ])
+                              ), -1).transpose(0, 2)
+            else:
+                assert False, "Shape of \"K\" is wrong."
+            """
             # my projection 2
             q = self.my_q_k1_proj(query)
             v = torch.matmul(query.transpose(0, 2), self.my_v_k2_proj.weight.T[:query.size(0), ]).transpose(0, 2)
             k_1 = self.my_q_k1_proj(query)
             k = torch.matmul(k_1.transpose(0, 2), self.my_v_k2_proj.weight.T[:query.size(0), ]).transpose(0, 2)
-            """
+            
             # my projection 1
             q = self.my_q_proj(query)
             v = torch.matmul(query.transpose(0, 2), self.my_v_proj.weight.T[:query.size(0), ]).transpose(0, 2)
