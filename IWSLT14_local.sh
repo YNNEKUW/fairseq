@@ -4,7 +4,7 @@ fairseq-train \
     --share-decoder-input-output-embed \
     --optimizer adam \
     --adam-betas '(0.9, 0.98)' \
-    --lr 1e-3 \
+    --lr 5e-4 \
     --lr-scheduler inverse_sqrt \
     --warmup-updates 4000 \
     --dropout 0.3 \
@@ -19,8 +19,8 @@ fairseq-train \
     --eval-bleu-print-samples \
     --best-checkpoint-metric bleu --maximize-best-checkpoint-metric \
     --num-workers 8 \
-    --save-dir checkpoints/transformer_iwslt_de_en_6_6_mine_baseline_v2_2_test
-
+    --save-dir checkpoints/transformer_iwslt_de_en_6_6_mine_baseline_v4_2_test \
+    --adam-eps 1e-9
 
 #   data-bin/iwslt14.tokenized.de-en \
 # --save-dir checkpoints/transformer_iwslt_de_en_6_6_relu_size_alpha0.25_noclip_test \

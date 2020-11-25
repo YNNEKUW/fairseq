@@ -1235,7 +1235,7 @@ class MultiheadAttention_sigmoid(nn.Module):
                 assert False, "Shape of \"V\" is wrong."
             
             # K
-            q_split_on_length = torch.split(torch.clone(q).transpose(0, 2), self.segment_length, 2)           
+            q_split_on_length = torch.split(q.transpose(0, 2), self.segment_length, 2)           
             if len(q_split_on_length) == 1:
                 k = torch.matmul(q_split_on_length[0], self.my_v_k2_proj_1.weight.T[:q_split_on_length[0].size(2), ]).transpose(0, 2)
             elif len(q_split_on_length) == 2:
@@ -1255,6 +1255,7 @@ class MultiheadAttention_sigmoid(nn.Module):
                               ), -1).transpose(0, 2)
             else:
                 assert False, "Shape of \"K\" is wrong."
+            
             """
             # my projection 2
             q = self.my_q_k1_proj(query)
@@ -1284,7 +1285,7 @@ class MultiheadAttention_sigmoid(nn.Module):
             q = self.q_proj(query)
             k = self.k_proj(key)
             v = self.v_proj(value)        
-        q *= self.scaling
+        q = q * self.scaling
 
         if self.bias_k is not None:
             assert self.bias_v is not None
@@ -1379,8 +1380,8 @@ class MultiheadAttention_sigmoid(nn.Module):
             assert incremental_state is not None
             incremental_state = self._set_input_buffer(incremental_state, saved_state)
         """
-        assert k is not None
-        src_len = k.size(1)
+        # assert k is not None
+        # src_len = k.size(1)
         """
         # This is part of a workaround to get around fork/join parallelism
         # not supporting Optional types.
@@ -1412,8 +1413,18 @@ class MultiheadAttention_sigmoid(nn.Module):
                     dim=1,
                 )
         """
-        attn_weights = torch.bmm(q, k.transpose(1, 2))
-        attn_weights = MultiheadAttention.apply_sparse_mask(attn_weights, tgt_len, src_len, bsz)
+        # softmax on "K"
+        attn_weights = utils.softmax(
+            k, dim=1, onnx_trace=self.onnx_trace
+        )
+        attn_probs = F.dropout(
+            attn_weights,
+            p=self.dropout,
+            training=self.training,
+        )
+        attn = torch.bmm(q, torch.bmm(attn_probs.transpose(1, 2), v))
+        # attn_weights = torch.bmm(q, k.transpose(1, 2))
+        # attn_weights = MultiheadAttention.apply_sparse_mask(attn_weights, tgt_len, src_len, bsz)
         """
         assert list(attn_weights.size()) == [bsz * self.num_heads, tgt_len, src_len]
         
@@ -1438,15 +1449,15 @@ class MultiheadAttention_sigmoid(nn.Module):
                 attn_weights = attn_weights.transpose(0, 2)
             attn_weights = attn_weights.view(bsz * self.num_heads, tgt_len, src_len)
 
-        """
+        
         
         if before_softmax:
             return attn_weights, v
-
+        """
+        """
         attn_weights_float = utils.softmax(
             attn_weights, dim=-1, onnx_trace=self.onnx_trace
         )
-        
         attn_weights = attn_weights_float.type_as(attn_weights)
         attn_probs = F.dropout(
             attn_weights,
@@ -1454,6 +1465,7 @@ class MultiheadAttention_sigmoid(nn.Module):
             training=self.training,
         )
         attn = torch.bmm(attn_probs, v)
+        """
         
         assert v is not None
         
