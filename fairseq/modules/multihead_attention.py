@@ -1029,10 +1029,16 @@ class MultiheadAttention_sigmoid(nn.Module):
         self.my_q_k1_proj_3 = quant_noise(nn.Linear(int(embed_dim/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
         self.my_q_k1_proj_4 = quant_noise(nn.Linear(int(embed_dim/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
         
-        self.my_v_k2_proj_1 = quant_noise(nn.Linear(int(my_max_length/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
-        self.my_v_k2_proj_2 = quant_noise(nn.Linear(int(my_max_length/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
-        self.my_v_k2_proj_3 = quant_noise(nn.Linear(int(my_max_length/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
-        self.my_v_k2_proj_4 = quant_noise(nn.Linear(int(my_max_length/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
+        self.my_k_proj_1 = quant_noise(nn.Linear(int(my_max_length/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
+        self.my_k_proj_2 = quant_noise(nn.Linear(int(my_max_length/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
+        self.my_k_proj_3 = quant_noise(nn.Linear(int(my_max_length/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
+        self.my_k_proj_4 = quant_noise(nn.Linear(int(my_max_length/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
+
+
+        self.my_v_proj_1 = quant_noise(nn.Linear(int(my_max_length/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
+        self.my_v_proj_2 = quant_noise(nn.Linear(int(my_max_length/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
+        self.my_v_proj_3 = quant_noise(nn.Linear(int(my_max_length/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
+        self.my_v_proj_4 = quant_noise(nn.Linear(int(my_max_length/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
         """
         # my projection 2
         self.my_q_k1_proj = quant_noise(nn.Linear(embed_dim, int(embed_dim/self.scalar), bias=bias), q_noise, qn_block_size)
@@ -1089,10 +1095,14 @@ class MultiheadAttention_sigmoid(nn.Module):
             nn.init.xavier_uniform_(self.my_q_k1_proj_2.weight)
             nn.init.xavier_uniform_(self.my_q_k1_proj_3.weight)
             nn.init.xavier_uniform_(self.my_q_k1_proj_4.weight)
-            nn.init.xavier_uniform_(self.my_v_k2_proj_1.weight)
-            nn.init.xavier_uniform_(self.my_v_k2_proj_2.weight)
-            nn.init.xavier_uniform_(self.my_v_k2_proj_3.weight)
-            nn.init.xavier_uniform_(self.my_v_k2_proj_4.weight)
+            nn.init.xavier_uniform_(self.my_k_proj_1.weight)
+            nn.init.xavier_uniform_(self.my_k_proj_2.weight)
+            nn.init.xavier_uniform_(self.my_k_proj_3.weight)
+            nn.init.xavier_uniform_(self.my_k_proj_4.weight)
+            nn.init.xavier_uniform_(self.my_v_proj_1.weight)
+            nn.init.xavier_uniform_(self.my_v_proj_2.weight)
+            nn.init.xavier_uniform_(self.my_v_proj_3.weight)
+            nn.init.xavier_uniform_(self.my_v_proj_4.weight)
             """
             nn.init.xavier_uniform_(self.my_q_k1_proj.weight)
             nn.init.xavier_uniform_(self.my_v_k2_proj.weight)
@@ -1215,21 +1225,21 @@ class MultiheadAttention_sigmoid(nn.Module):
             # V
             query_split_on_length = torch.split(query.transpose(0, 2), self.segment_length, 2)
             if len(query_split_on_length) == 1:
-                v = torch.matmul(query_split_on_length[0], self.my_v_k2_proj_1.weight.T[:query_split_on_length[0].size(2), ]).transpose(0, 2)
+                v = torch.matmul(query_split_on_length[0], self.my_v_proj_1.weight.T[:query_split_on_length[0].size(2), ]).transpose(0, 2)
             elif len(query_split_on_length) == 2:
-                v = torch.cat((self.my_v_k2_proj_1(query_split_on_length[0]),
-                               torch.matmul(query_split_on_length[1], self.my_v_k2_proj_2.weight.T[:query_split_on_length[1].size(2), ])
+                v = torch.cat((self.my_v_proj_1(query_split_on_length[0]),
+                               torch.matmul(query_split_on_length[1], self.my_v_proj_2.weight.T[:query_split_on_length[1].size(2), ])
                               ), -1).transpose(0, 2)
             elif len(query_split_on_length) == 3:
-                v = torch.cat((self.my_v_k2_proj_1(query_split_on_length[0]),
-                               self.my_v_k2_proj_2(query_split_on_length[1]),
-                               torch.matmul(query_split_on_length[2], self.my_v_k2_proj_3.weight.T[:query_split_on_length[2].size(2), ])
+                v = torch.cat((self.my_v_proj_1(query_split_on_length[0]),
+                               self.my_v_proj_2(query_split_on_length[1]),
+                               torch.matmul(query_split_on_length[2], self.my_v_proj_3.weight.T[:query_split_on_length[2].size(2), ])
                               ), -1).transpose(0, 2)
             elif len(query_split_on_length) == 4:
-                v = torch.cat((self.my_v_k2_proj_1(query_split_on_length[0]),
-                               self.my_v_k2_proj_2(query_split_on_length[1]),
-                               self.my_v_k2_proj_3(query_split_on_length[2]),
-                               torch.matmul(query_split_on_length[3], self.my_v_k2_proj_4.weight.T[:query_split_on_length[3].size(2), ])
+                v = torch.cat((self.my_v_proj_1(query_split_on_length[0]),
+                               self.my_v_proj_2(query_split_on_length[1]),
+                               self.my_v_proj_3(query_split_on_length[2]),
+                               torch.matmul(query_split_on_length[3], self.my_v_proj_4.weight.T[:query_split_on_length[3].size(2), ])
                               ), -1).transpose(0, 2)
             else:
                 assert False, "Shape of \"V\" is wrong."
@@ -1237,21 +1247,21 @@ class MultiheadAttention_sigmoid(nn.Module):
             # K
             q_split_on_length = torch.split(q.transpose(0, 2), self.segment_length, 2)           
             if len(q_split_on_length) == 1:
-                k = torch.matmul(q_split_on_length[0], self.my_v_k2_proj_1.weight.T[:q_split_on_length[0].size(2), ]).transpose(0, 2)
+                k = torch.matmul(q_split_on_length[0], self.my_k_proj_1.weight.T[:q_split_on_length[0].size(2), ]).transpose(0, 2)
             elif len(q_split_on_length) == 2:
-                k = torch.cat((self.my_v_k2_proj_1(q_split_on_length[0]),
-                               torch.matmul(q_split_on_length[1], self.my_v_k2_proj_2.weight.T[:q_split_on_length[1].size(2), ])
+                k = torch.cat((self.my_k_proj_1(q_split_on_length[0]),
+                               torch.matmul(q_split_on_length[1], self.my_k_proj_2.weight.T[:q_split_on_length[1].size(2), ])
                               ), -1).transpose(0, 2)
             elif len(q_split_on_length) == 3:
-                k = torch.cat((self.my_v_k2_proj_1(q_split_on_length[0]),
-                               self.my_v_k2_proj_2(q_split_on_length[1]),
-                               torch.matmul(q_split_on_length[2], self.my_v_k2_proj_3.weight.T[:q_split_on_length[2].size(2), ])
+                k = torch.cat((self.my_k_proj_1(q_split_on_length[0]),
+                               self.my_k_proj_2(q_split_on_length[1]),
+                               torch.matmul(q_split_on_length[2], self.my_k_proj_3.weight.T[:q_split_on_length[2].size(2), ])
                               ), -1).transpose(0, 2)
             elif len(q_split_on_length) == 4:
-                k = torch.cat((self.my_v_k2_proj_1(q_split_on_length[0]),
-                               self.my_v_k2_proj_2(q_split_on_length[1]),
-                               self.my_v_k2_proj_3(q_split_on_length[2]),
-                               torch.matmul(q_split_on_length[3], self.my_v_k2_proj_4.weight.T[:q_split_on_length[3].size(2), ])
+                k = torch.cat((self.my_k_proj_1(q_split_on_length[0]),
+                               self.my_k_proj_2(q_split_on_length[1]),
+                               self.my_k_proj_3(q_split_on_length[2]),
+                               torch.matmul(q_split_on_length[3], self.my_k_proj_4.weight.T[:q_split_on_length[3].size(2), ])
                               ), -1).transpose(0, 2)
             else:
                 assert False, "Shape of \"K\" is wrong."
@@ -1382,6 +1392,7 @@ class MultiheadAttention_sigmoid(nn.Module):
         """
         # assert k is not None
         # src_len = k.size(1)
+        src_len = key_padding_mask.size(1)
         """
         # This is part of a workaround to get around fork/join parallelism
         # not supporting Optional types.
@@ -1413,6 +1424,7 @@ class MultiheadAttention_sigmoid(nn.Module):
                     dim=1,
                 )
         """
+        """
         # softmax on "K"
         attn_weights = utils.softmax(
             k, dim=1, onnx_trace=self.onnx_trace
@@ -1423,8 +1435,9 @@ class MultiheadAttention_sigmoid(nn.Module):
             training=self.training,
         )
         attn = torch.bmm(q, torch.bmm(attn_probs.transpose(1, 2), v))
-        # attn_weights = torch.bmm(q, k.transpose(1, 2))
-        # attn_weights = MultiheadAttention.apply_sparse_mask(attn_weights, tgt_len, src_len, bsz)
+        """
+        attn_weights = torch.bmm(q, k.transpose(1, 2))
+        attn_weights = MultiheadAttention.apply_sparse_mask(attn_weights, tgt_len, src_len, bsz)
         """
         assert list(attn_weights.size()) == [bsz * self.num_heads, tgt_len, src_len]
         
@@ -1454,7 +1467,7 @@ class MultiheadAttention_sigmoid(nn.Module):
         if before_softmax:
             return attn_weights, v
         """
-        """
+        # """
         attn_weights_float = utils.softmax(
             attn_weights, dim=-1, onnx_trace=self.onnx_trace
         )
@@ -1465,7 +1478,7 @@ class MultiheadAttention_sigmoid(nn.Module):
             training=self.training,
         )
         attn = torch.bmm(attn_probs, v)
-        """
+        # """
         
         assert v is not None
         
