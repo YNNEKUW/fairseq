@@ -1021,7 +1021,7 @@ class MultiheadAttention_sigmoid(nn.Module):
         my_max_length = 280
         self.segment_length = int(my_max_length / self.beta)
         self.my_head_dim = int(self.head_dim / self.scalar)
-        
+        """
         # my projection 3
         # group attention
         self.my_q_k1_proj_1 = quant_noise(nn.Linear(int(embed_dim/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
@@ -1040,10 +1040,13 @@ class MultiheadAttention_sigmoid(nn.Module):
         self.my_v_proj_3 = quant_noise(nn.Linear(int(my_max_length/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
         self.my_v_proj_4 = quant_noise(nn.Linear(int(my_max_length/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
         """
+        
         # my projection 2
         self.my_q_k1_proj = quant_noise(nn.Linear(embed_dim, int(embed_dim/self.scalar), bias=bias), q_noise, qn_block_size)
-        self.my_v_k2_proj = quant_noise(nn.Linear(my_max_length, int(embed_dim/self.scalar), bias=bias), q_noise, qn_block_size)
-        
+        self.my_k_proj = quant_noise(nn.Linear(my_max_length, int(embed_dim/self.scalar), bias=bias), q_noise, qn_block_size)
+        self.my_v_proj = quant_noise(nn.Linear(my_max_length, int(embed_dim/self.scalar), bias=bias), q_noise, qn_block_size)
+
+        """
         # my projection 1
         # [512, 768] -> [512, 768/8]
         self.my_q_proj = quant_noise(nn.Linear(embed_dim, int(embed_dim/self.scalar), bias=bias), q_noise, qn_block_size)
@@ -1090,7 +1093,7 @@ class MultiheadAttention_sigmoid(nn.Module):
             nn.init.xavier_uniform_(self.my_k_proj_2.weight)
             nn.init.xavier_uniform_(self.my_v_proj.weight)
             """
-
+            """
             nn.init.xavier_uniform_(self.my_q_k1_proj_1.weight)
             nn.init.xavier_uniform_(self.my_q_k1_proj_2.weight)
             nn.init.xavier_uniform_(self.my_q_k1_proj_3.weight)
@@ -1105,8 +1108,10 @@ class MultiheadAttention_sigmoid(nn.Module):
             nn.init.xavier_uniform_(self.my_v_proj_4.weight)
             """
             nn.init.xavier_uniform_(self.my_q_k1_proj.weight)
-            nn.init.xavier_uniform_(self.my_v_k2_proj.weight)
-            """
+            nn.init.xavier_uniform_(self.my_k_proj.weight)
+            nn.init.xavier_uniform_(self.my_v_proj.weight)
+
+            
             """
             nn.init.xavier_uniform_(self.k_proj.weight, gain=1 / math.sqrt(2))
             nn.init.xavier_uniform_(self.v_proj.weight, gain=1 / math.sqrt(2))
@@ -1213,6 +1218,7 @@ class MultiheadAttention_sigmoid(nn.Module):
             k = self.k_proj(query)
             v = self.v_proj(query)
             """
+            """
             # my projection 3
             # Q
             assert query.shape[2] % self.beta == 0
@@ -1269,10 +1275,9 @@ class MultiheadAttention_sigmoid(nn.Module):
             """
             # my projection 2
             q = self.my_q_k1_proj(query)
-            v = torch.matmul(query.transpose(0, 2), self.my_v_k2_proj.weight.T[:query.size(0), ]).transpose(0, 2)
-            k_1 = self.my_q_k1_proj(query)
-            k = torch.matmul(k_1.transpose(0, 2), self.my_v_k2_proj.weight.T[:query.size(0), ]).transpose(0, 2)
-            
+            v = torch.matmul(query.transpose(0, 2), self.my_v_proj.weight.T[:query.size(0), ]).transpose(0, 2)
+            k = torch.matmul(q.transpose(0, 2), self.my_k_proj.weight.T[:query.size(0), ]).transpose(0, 2)
+            """
             # my projection 1
             q = self.my_q_proj(query)
             v = torch.matmul(query.transpose(0, 2), self.my_v_proj.weight.T[:query.size(0), ]).transpose(0, 2)
