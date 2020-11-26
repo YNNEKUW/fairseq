@@ -1016,7 +1016,7 @@ class MultiheadAttention_sigmoid(nn.Module):
         self.v_proj = quant_noise(nn.Linear(self.vdim, embed_dim, bias=bias), q_noise, qn_block_size)
         self.q_proj = quant_noise(nn.Linear(embed_dim, embed_dim, bias=bias), q_noise, qn_block_size)
         """
-        self.scalar = 2
+        self.scalar = 1
         self.beta = 4
         my_max_length = 280
         self.segment_length = int(my_max_length / self.beta)

@@ -4,8 +4,8 @@ python fairseq_cli_train.py \
     --share-decoder-input-output-embed \
     --optimizer adam \
     --adam-betas '(0.9, 0.98)' \
-    --lr 8e-4 \
-    --warmup-updates 10000 \
+    --lr 5e-4 \
+    --warmup-updates 4000 \
     --dropout 0.3 \
     --weight-decay 0.0001 \
     --criterion label_smoothed_cross_entropy \
@@ -18,7 +18,7 @@ python fairseq_cli_train.py \
     --eval-bleu-print-samples \
     --best-checkpoint-metric bleu --maximize-best-checkpoint-metric \
     --num-workers 8 \
-    --save-dir /groups/alliryc/fairseq_checkpoints/transformer_iwslt_de_en_6_6_mine_baseline_v2_2_8e-4_adam_eps_1e-9_warmup_10000 \
+    --save-dir /groups/alliryc/fairseq_checkpoints/transformer_iwslt_de_en_6_6_mine_baseline_v4_1_5e-4_eps_1e-9_4000 \
     --lr-scheduler inverse_sqrt \
     --adam-eps 1e-9
 # --clip-norm 0.1 # is required when using normalized version
