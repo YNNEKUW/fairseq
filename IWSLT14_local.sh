@@ -19,9 +19,8 @@ fairseq-train \
     --eval-bleu-print-samples \
     --best-checkpoint-metric bleu --maximize-best-checkpoint-metric \
     --num-workers 8 \
-    --save-dir checkpoints/transformer_iwslt_de_en_6_6_mine_baseline_v5.1_1 \
-    --adam-eps 1e-9
-
+    --save-dir checkpoints/transformer_iwslt_de_en_6_6_mine_baseline_v6 \
+#    --adam-eps 1e-9
 #   data-bin/iwslt14.tokenized.de-en \
 # --save-dir checkpoints/transformer_iwslt_de_en_6_6_relu_size_alpha0.25_noclip_test \
 # --clip-norm 0.1 # is required when using normalized version

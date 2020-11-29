@@ -1003,7 +1003,7 @@ class MultiheadAttention_sigmoid(nn.Module):
         assert (
             self.head_dim * num_heads == self.embed_dim
         ), "embed_dim must be divisible by num_heads"
-        self.scaling = self.head_dim ** -0.5
+        # self.scaling = self.head_dim ** -0.5
 
         self.self_attention = self_attention
         self.encoder_decoder_attention = encoder_decoder_attention
@@ -1011,18 +1011,24 @@ class MultiheadAttention_sigmoid(nn.Module):
         assert not self.self_attention or self.qkv_same_dim, (
             "Self-attention requires query, key and " "value to be of the same size"
         )
-        
+        """
         self.k_proj = quant_noise(nn.Linear(self.kdim, embed_dim, bias=bias), q_noise, qn_block_size)
         self.v_proj = quant_noise(nn.Linear(self.vdim, embed_dim, bias=bias), q_noise, qn_block_size)
         self.q_proj = quant_noise(nn.Linear(embed_dim, embed_dim, bias=bias), q_noise, qn_block_size)
-        
         """
         self.scalar = 1
-        self.beta = 4
+        # self.beta = 4
         my_max_length = 280
-        self.segment_length = int(my_max_length / self.beta)
-        self.my_head_dim = int(self.head_dim / self.scalar)
-        """
+        # self.segment_length = int(my_max_length / self.beta)
+        self.my_head_dim = self.head_dim // self.scalar
+        self.scaling = self.my_head_dim ** -0.5
+        # """
+        # """
+        # my projection 2
+        self.my_k_proj = quant_noise(nn.Linear(my_max_length, my_max_length//self.scalar, bias=bias), q_noise, qn_block_size)
+        self.my_v_proj = quant_noise(nn.Linear(my_max_length, my_max_length//self.scalar, bias=bias), q_noise, qn_block_size)
+        self.my_q_proj = quant_noise(nn.Linear(embed_dim, embed_dim//self.scalar, bias=bias), q_noise, qn_block_size)
+        # """
         """
         # my projection 3
         # group attention
@@ -1042,12 +1048,7 @@ class MultiheadAttention_sigmoid(nn.Module):
         self.my_v_proj_3 = quant_noise(nn.Linear(int(my_max_length/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
         self.my_v_proj_4 = quant_noise(nn.Linear(int(my_max_length/self.beta), int(embed_dim/self.scalar/self.beta), bias=bias), q_noise, qn_block_size)
         """
-        """
-        # my projection 2
-        self.my_q_k1_proj = quant_noise(nn.Linear(embed_dim, int(embed_dim/self.scalar), bias=bias), q_noise, qn_block_size)
-        self.my_k_proj = quant_noise(nn.Linear(my_max_length, int(embed_dim/self.scalar), bias=bias), q_noise, qn_block_size)
-        self.my_v_proj = quant_noise(nn.Linear(my_max_length, int(embed_dim/self.scalar), bias=bias), q_noise, qn_block_size)
-        """
+
         """
         # my projection 1
         # [512, 768] -> [512, 768/8]
@@ -1109,14 +1110,16 @@ class MultiheadAttention_sigmoid(nn.Module):
             nn.init.xavier_uniform_(self.my_v_proj_3.weight)
             nn.init.xavier_uniform_(self.my_v_proj_4.weight)
             """
-            """
-            nn.init.xavier_uniform_(self.my_q_k1_proj.weight)
+            # """
+            nn.init.xavier_uniform_(self.my_q_proj.weight)
             nn.init.xavier_uniform_(self.my_k_proj.weight)
             nn.init.xavier_uniform_(self.my_v_proj.weight)
+            # """
             """
             nn.init.xavier_uniform_(self.k_proj.weight, gain=1 / math.sqrt(2))
             nn.init.xavier_uniform_(self.v_proj.weight, gain=1 / math.sqrt(2))
             nn.init.xavier_uniform_(self.q_proj.weight, gain=1 / math.sqrt(2))
+            """
             
         else:
             nn.init.xavier_uniform_(self.k_proj.weight)
@@ -1214,11 +1217,11 @@ class MultiheadAttention_sigmoid(nn.Module):
             saved_state = None
 
         if self.self_attention:
-            
+            """
             q = self.q_proj(query)
             k = self.k_proj(q)
             v = self.v_proj(query)
-            
+            """
             """
             # my projection 3
             # Q
@@ -1274,12 +1277,14 @@ class MultiheadAttention_sigmoid(nn.Module):
                 assert False, "Shape of \"K\" is wrong."
             
             """
-            """
+            # """
             # my projection 2
-            q = self.my_q_k1_proj(query)
-            v = torch.matmul(query.transpose(0, 2), self.my_v_proj.weight.T[:query.size(0), ]).transpose(0, 2)
-            k = torch.matmul(q.transpose(0, 2), self.my_k_proj.weight.T[:query.size(0), ]).transpose(0, 2)
-            """
+            q = self.my_q_proj(query)
+            v = torch.matmul(query.transpose(0, 2), self.my_v_proj.weight.T[:query.size(0), :query.size(0)//self.scalar+1]).transpose(0, 2)
+            k = torch.matmul(q.transpose(0, 2), self.my_k_proj.weight.T[:q.size(0), :q.size(0)//self.scalar+1]).transpose(0, 2)
+            # v = torch.matmul(query.transpose(0, 2), self.my_v_proj.weight.T[:query.size(0), ]).transpose(0, 2)
+            # k = torch.matmul(q.transpose(0, 2), self.my_k_proj.weight.T[:query.size(0), ]).transpose(0, 2)
+            # """
             """
             # my projection 1
             q = self.my_q_proj(query)
@@ -1321,7 +1326,7 @@ class MultiheadAttention_sigmoid(nn.Module):
                     ],
                     dim=1,
                 )
-        """
+        # """
         q = (
             q.contiguous()
             .view(tgt_len, bsz * self.num_heads, self.my_head_dim)
@@ -1357,7 +1362,7 @@ class MultiheadAttention_sigmoid(nn.Module):
                 .view(-1, bsz * self.num_heads, self.head_dim)
                 .transpose(0, 1)
             )
-        # """
+        """
         """
         if saved_state is not None:
             # saved states are stored with shape (bsz, num_heads, seq_len, head_dim)
